@@ -1,0 +1,12 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/9.1">
+<soapenv:Header/>
+	<soapenv:Body>
+		<ns:addSrst>
+			<srst>
+				<name>[[cbitId]]_SRST</name>
+				<ipAddress>[[cbitSrst1Ip]]</ipAddress>
+				<SipNetwork>[[cbitSrst1Ip]]</SipNetwork>
+			</srst>
+		</ns:addSrst>
+	</soapenv:Body>
+</soapenv:Envelope>

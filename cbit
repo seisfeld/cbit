@@ -1,0 +1,791 @@
+#!/usr/bin/php
+<?php
+//cbit - cucm bulk import tool
+
+//name and version
+$uname = 'cbit v1.21.1';
+
+//define some arrays
+$templates = array();
+$templates_missing = array();
+$templates_with_unsupported_version = array();
+$templates_with_unknown_variables = array();
+$jobsummary = array();
+$jobsfailed = array();
+
+//which cucm:db version supports which axl api version(s)
+$cucmdb_supported_axl_apis['10.5'] = array('10.5', '10.0', '9.1', '9.0', '8.5', '8.0');
+$cucmdb_supported_axl_apis['10.0'] = array('10.0', '9.1', '9.0', '8.5', '8.0');
+$cucmdb_supported_axl_apis['9.1'] = array('9.1', '9.0', '8.5', '8.0', '7.1');
+$cucmdb_supported_axl_apis['9.0'] = array('9.0', '8.5', '8.0', '7.1');
+$cucmdb_supported_axl_apis['8.6'] = array('8.5', '8.0', '7.1', '7.0');
+$cucmdb_supported_axl_apis['8.5'] = array('8.5', '8.0', '7.1', '7.0');
+$cucmdb_supported_axl_apis['8.0'] = array('8.0', '7.1', '7.0', '6.1');
+$cucmdb_supported_axl_apis['7.1'] = array('7.1', '7.0', '6.1', '6.0');
+$cucmdb_supported_axl_apis['7.0'] = array('7.0', '6.1', '6.0');
+$cucmdb_supported_axl_apis['6.1'] = array('6.1', '6.0');
+$cucmdb_supported_axl_apis['6.0'] = array('6.0');
+
+//always display time in UTC
+date_default_timezone_set('UTC');
+
+//require cbit_config.h, exit if not found
+if (file_exists('cbit_config.h')) {
+    require 'cbit_config.h';
+  }
+else {
+      print("$uname. cbit_config.h not found. exiting.\n");
+      die();
+     }
+
+//function array_has_duplicates
+function array_has_duplicates($array) {
+         return count(array_flip($array)) != count($array);
+        }
+
+//function ansi
+function ansi($color, $message) {
+         //define ansi colors
+         $ansicolor['red'] = 31;
+         $ansicolor['green'] = 32;
+         $ansicolor['yellow'] = 33;
+         //we run on windows, don't return any ansi colors
+         if (strncasecmp(PHP_OS, 'WIN', 3) == 0) {
+             return $message;
+           }
+         //we don't run on windows
+         else {
+               return "\e[".$ansicolor[$color]."m".$message."\e[0m";
+              }
+        }
+
+//function call_axl_api
+function call_axl_api($request, $version, $url, $user, $pass, $interface) {
+         $soap_request = curl_init();
+         curl_setopt($soap_request, CURLOPT_URL, $url);
+         curl_setopt($soap_request, CURLOPT_CONNECTTIMEOUT, 3);
+         curl_setopt($soap_request, CURLOPT_RETURNTRANSFER, TRUE);
+         curl_setopt($soap_request, CURLOPT_SSL_VERIFYPEER, FALSE);
+         curl_setopt($soap_request, CURLOPT_SSL_VERIFYHOST, FALSE);
+         curl_setopt($soap_request, CURLOPT_POST, TRUE);
+         curl_setopt($soap_request, CURLOPT_POSTFIELDS, $request);
+         curl_setopt($soap_request, CURLOPT_HTTPHEADER, array('Content-Type: text/xml; charset=utf-8', 'SOAPAction: CUCM:DB ver='.$version, 'Content-Length: '.strlen($request)));
+         curl_setopt($soap_request, CURLOPT_USERPWD, $user.':'.$pass);
+         curl_setopt($soap_request, CURLOPT_INTERFACE, $interface);
+         $soap_response = curl_exec($soap_request);
+         $curl_error = curl_errno($soap_request);
+         $http_code = curl_getinfo($soap_request, CURLINFO_HTTP_CODE);
+         $connect_time = round(curl_getinfo($soap_request, CURLINFO_CONNECT_TIME) * 1000);
+         $total_time = round(curl_getinfo($soap_request, CURLINFO_TOTAL_TIME) * 1000);
+         curl_close($soap_request);
+         return array($soap_response, $curl_error, $http_code, $connect_time, $total_time);
+        }
+
+//function get_cucm_version
+function get_cucm_version($axl_api_version_list, $cluster, $clusterid) {
+         $detected_cucm_version = FALSE;
+
+         //cycle through all supported versions to detect cucm:db version
+         foreach ($axl_api_version_list as $axl_api_version => $foo) {
+                  //build request for getCCMVersion
+                  $get_cucm_version_request = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/'.$axl_api_version.'"><soapenv:Header/><soapenv:Body><ns:getCCMVersion></ns:getCCMVersion></soapenv:Body></soapenv:Envelope>';
+
+                  //fire axl api call
+                  try {
+                       list($response, $curl_error, $http_code, $connect_time, $total_time) = call_axl_api($get_cucm_version_request, $axl_api_version, $cluster[$clusterid]['url'], $cluster[$clusterid]['user'], $cluster[$clusterid]['pass'], $cluster[$clusterid]['interface']);
+
+                       //the reply was not an error message
+                       if (strpos($response, '<!-- custom Cisco error page -->') === FALSE) {
+                           //get returned cucm version
+                           $response_xml = new SimpleXMLElement($response);
+                           $detected_cucm_version = $response_xml->xpath('//*/*/*/*/*/version');
+                           $detected_cucm_version = strval($detected_cucm_version[0]);
+
+                           //derive cucm:db version from detected cucm version
+                           $detected_cucm_version_split = explode('.', $detected_cucm_version);
+                           $detected_cucmdb_version = $detected_cucm_version_split[0].".".$detected_cucm_version_split[1];
+
+                           //we detected something, break foreach
+                           break;
+                         }
+                      }
+                  //oops. something went wrong, return no version
+                  catch (Exception $exception) {
+                         return array(FALSE, FALSE, $curl_error, $http_code, $connect_time, $total_time);
+                       }
+                }
+
+         //check if we detected a version. if yes, return it - if not, return FALSE
+         if ($detected_cucm_version && preg_match("/^[0-9]{1,}.[0-9]{1,}$/", $detected_cucmdb_version)) {
+             return array($detected_cucm_version, $detected_cucmdb_version, $curl_error, $http_code, $connect_time, $total_time);
+           }
+         else {
+               return array(FALSE, FALSE, $curl_error, $http_code, $connect_time, $total_time);
+              }
+        }
+
+//function is_cucmdb_version_supported
+function is_cucmdb_version_supported($supported_axl_apis, $version) {
+         if (array_key_exists($version, $supported_axl_apis)) {
+             return TRUE;
+           }
+         else {
+               return FALSE;
+              }
+        }
+
+//if the log file already exists, delete it
+if (file_exists($log_file)) {
+    unlink($log_file);
+  }
+
+//print and log cbit version
+$time = date('Y-m-d H:i:s');
+print(substr($time, -8)." $uname starting up\n");
+print(substr($time, -8)." use -h for help\n");
+print(substr($time, -8)." using $log_file to log messages\n");
+file_put_contents($log_file, "\n$time $uname start", FILE_APPEND | LOCK_EX);
+
+//parse command line arguments
+$options = getopt('f:b::csh');
+
+//display help, exit
+if (isset($options['h'])) {
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." available command line options:\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." -h display this help\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." -c dump config\n");
+    print(substr($time, -8)." -b<iterations> bench latency (defaults to 10 if <iterations> is omitted)\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." -f<file> specify source csv file\n");
+    print(substr($time, -8)." -s disable skip mode (skip mode is enabled by default)\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." The MIT License (MIT) - see LICENSE file\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." $uname Copyright (c) 2014-2015 Stephan Eisfeld\n");
+    print(substr($time, -8)."\n");
+    print(substr($time, -8)." exiting\n");
+    file_put_contents($log_file, "\n$time displaying help", FILE_APPEND | LOCK_EX);
+    file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+    die();
+  }
+
+//dump config, exit
+if (isset($options['c'])) {
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." dumping config\n");
+    print(substr($time, -8)." ".$cucm_profile[$cucm]['user'].":".$cucm_profile[$cucm]['pass']."@".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].")\n");
+    print(substr($time, -8)." outgoing interface: ".$cucm_profile[$cucm]['interface']."\n");
+    print(substr($time, -8)." ".count($templates)." template(s) configured\n");
+    foreach ($templates as $template) {
+             print(substr($time, -8)."   $template");
+             //template found on disk
+             if (file_exists($template)) {
+                 //extract version from template
+                 preg_match_all('/com\/axl\/api\/([0-9\.]*)/i', file_get_contents($template), $preg_match_all_result, PREG_PATTERN_ORDER);
+                 $template_file_version = strval($preg_match_all_result[1][0]);
+
+                 //we failed to extract the version, print 'null'
+                 if (!$template_file_version) {
+                     print(" | ".ansi('red', 'null')." [".ansi('green', 'found')."]\n");
+                   }
+                 //we successfully extracted the version
+                 else {
+                       print(" | $template_file_version [".ansi('green', 'found')."]\n");
+                      }
+               }
+             //template not found on disk
+             else {
+                   print(" [".ansi('red', 'not found')."]\n");
+                  }
+           }
+    print(substr($time, -8)." exiting\n");
+    file_put_contents($log_file, "\n$time dumping config", FILE_APPEND | LOCK_EX);
+    file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+    die();
+  }
+
+//bench latency, exit
+if (isset($options['b'])) {
+    //get bench iterations from command line
+    $benchiterations = $options['b'];
+
+    //if no iterations given, default to 10 iterations
+    if (!$benchiterations) {
+        $benchiterations = 10;
+      }
+
+    //reachability and version check
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." checking ".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].") reachablility");
+    list($cucm_version, $cucmdb_version, $curl_error, $http_code, $connect_time, $total_time) = get_cucm_version($cucmdb_supported_axl_apis, $cucm_profile, $cucm);
+
+    //server is reachable
+    if ($curl_error == 0) {
+        print(" [".ansi('green', 'ok')."]\n");
+        file_put_contents($log_file, "\n$time ".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].") is reachable", FILE_APPEND | LOCK_EX);
+
+        //check if axl api is responding and supported
+        $time = date('Y-m-d H:i:s');
+        print(substr($time, -8)." checking if axl api is responding and supported");
+
+        //axl api is responding and supported
+        if (is_cucmdb_version_supported($cucmdb_supported_axl_apis, $cucmdb_version)) {
+            print(" [".ansi('green', 'ok')."]\n");
+            print(substr($time, -8)."   connect time: ".$connect_time."ms | total request time: ".$total_time."ms\n");
+            print(substr($time, -8)."   found cucm version: $cucm_version\n");
+            print(substr($time, -8)."     assuming cucm:db: $cucmdb_version [".ansi('green', 'supported')."]\n");
+            file_put_contents($log_file, "\n$time axl api is responding", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time connect time: ".$connect_time."ms | total request time: ".$total_time."ms", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time found cucm version: $cucm_version", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time assuming cucm:db: $cucmdb_version", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time cucm:db $cucmdb_version is supported", FILE_APPEND | LOCK_EX);
+
+            $time = date('Y-m-d H:i:s');
+            print(substr($time, -8)." benching latency with $benchiterations iterations\n");
+            file_put_contents($log_file, "\n$time benching latency with $benchiterations iterations", FILE_APPEND | LOCK_EX);
+
+            //build request for getCCMVersion
+            $get_cucm_version_request = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/'.$cucmdb_version.'"><soapenv:Header/><soapenv:Body><ns:getCCMVersion></ns:getCCMVersion></soapenv:Body></soapenv:Envelope>';
+
+            //run latency benchmark now
+            $bench_connect_time = 0;
+            $bench_total_time = 0;
+            for ($i=1; $i <= $benchiterations; $i++) {
+                 $time = date('Y-m-d H:i:s');
+                 list($bench_response, $curl_error, $http_code, $connect_time, $total_time) = call_axl_api($get_cucm_version_request, $cucmdb_version, $cucm_profile[$cucm]['url'], $cucm_profile[$cucm]['user'], $cucm_profile[$cucm]['pass'], $cucm_profile[$cucm]['interface']);
+                 $bench_connect_time += $connect_time;
+                 $bench_total_time += $total_time;
+                 print(substr($time, -8)."   connect time: ".$connect_time."ms | total request time: ".$total_time."ms\n");
+                 file_put_contents($log_file, "\n$time connect time: ".$connect_time."ms | total request time: ".$total_time."ms", FILE_APPEND | LOCK_EX);
+               }
+            //print results, exit
+            $time = date('Y-m-d H:i:s');
+            print(substr($time, -8)."   average connect time: ".round($bench_connect_time/$benchiterations)."ms\n");
+            print(substr($time, -8)."   average total request time: ".round($bench_total_time/$benchiterations)."ms\n");
+            print(substr($time, -8)." exiting\n");
+            file_put_contents($log_file, "\n$time average connect time: ".round($bench_connect_time/$benchiterations)."ms", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time average total request time: ".round($bench_total_time/$benchiterations)."ms", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+            die();
+          }
+        //axl api is not responding or not supported, exit
+        else {
+              print(" [".ansi('red', 'fail')."]\n");
+              print(substr($time, -8)." debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]\n");
+              print(substr($time, -8)." exiting\n");
+              file_put_contents($log_file, "\n$time axl api not responding or not supported", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+              die();
+             }
+      }
+    //server is not reachable, exit
+    else {
+          print(" [".ansi('red', 'fail')."]\n");
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)." the following curl error occured: $curl_error\n");
+          print(substr($time, -8)." refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html\n");
+          print(substr($time, -8)." exiting\n");
+          file_put_contents($log_file, "\n$time exit with following curl error: $curl_error", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+          die();
+         }
+  }
+
+//csv file not specified, exit
+if (!isset($options['f'])) {
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." csv file not specified. use -f<file>\n");
+    print(substr($time, -8)." exiting\n");
+    file_put_contents($log_file, "\n$time csv file not specified", FILE_APPEND | LOCK_EX);
+    file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+    die();
+  }
+//csv file specified
+else {
+      $csv_file = $options['f'];
+      //csv file found
+      if (file_exists($csv_file)) {
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)." using $csv_file as source [".ansi('green', 'ok')."]\n");
+          file_put_contents($log_file, "\n$time using $csv_file as source", FILE_APPEND | LOCK_EX);
+
+          //read csv data file
+          $csv_data = file($csv_file, FILE_IGNORE_NEW_LINES);
+
+          //trim garbage from every element in $csv_data
+          foreach ($csv_data as $csv_data_key => $csv_data_value) {
+                   $csv_data[$csv_data_key] = trim($csv_data[$csv_data_key]);
+                 }
+
+          //check for valid header
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking for valid header");
+          if (!preg_match("/^$csv_delimiter/", $csv_data[0]) && !preg_match("/[$csv_delimiter]{2,}/", $csv_data[0]) && !preg_match("/$csv_delimiter$/", $csv_data[0]) && strlen($csv_data[0]) != 0) {
+              $csv_data_header_count = count(str_getcsv($csv_data[0], $csv_delimiter));
+              print(" [".ansi('green', "$csv_data_header_count columns")."]\n");
+              file_put_contents($log_file, "\n$time header has $csv_data_header_count columns", FILE_APPEND | LOCK_EX);
+            }
+          //header is not valid, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time header is invalid", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
+
+          //check for cbitId in header
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking for cbitId in header");
+          if (in_array("cbitId", str_getcsv($csv_data[0], $csv_delimiter))) {
+              print(" [".ansi('green', "ok")."]\n");
+              file_put_contents($log_file, "\n$time cbitId found in header", FILE_APPEND | LOCK_EX);
+            }
+          //cbitId not found in header, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time cbitId not found in header", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
+
+          //check for duplicates in header
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking for duplicates in header");
+          if (!array_has_duplicates(str_getcsv($csv_data[0], $csv_delimiter))) {
+              print(" [".ansi('green', 'ok')."]\n");
+              file_put_contents($log_file, "\n$time header has no duplicates", FILE_APPEND | LOCK_EX);
+            }
+          //header has duplicates, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                foreach (array_count_values(str_getcsv($csv_data[0], $csv_delimiter)) as $csv_header_duplicate_key => $csv_header_duplicate_value) {
+                         if ($csv_header_duplicate_value > 1) {
+                             $csv_header_duplicates[] = $csv_header_duplicate_key;
+                           }
+                       }
+                print(substr($time, -8)."     duplicate header(s): ".implode(', ',$csv_header_duplicates)."\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time ".count($csv_header_duplicates)." duplicate header(s): ".implode(', ',$csv_header_duplicates), FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
+
+          //discard all empty data rows
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   removing empty data rows");
+          $csv_data_rows_removed = 0;
+          foreach ($csv_data as $csv_data_key => &$csv_data_value) {
+                   if (preg_match("/^[$csv_delimiter\ \t]{1,}$/", $csv_data_value) || preg_match("/^$/", $csv_data_value)) {
+                       array_splice($csv_data, $csv_data_key, 1);
+                       $csv_data_rows_removed++;
+                     }
+                 }
+          unset($csv_data_value);
+          print(" [".ansi('green', "$csv_data_rows_removed removed")."]\n");
+          file_put_contents($log_file, "\n$time removed $csv_data_rows_removed empty data rows", FILE_APPEND | LOCK_EX);
+
+          //check if all data rows have the same column count as the header
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking data column count vs header count");
+          $csv_data_column_count_fail = FALSE;
+          foreach ($csv_data as $csv_data_key => $csv_data_value) {
+                   if (count(str_getcsv($csv_data_value, $csv_delimiter)) != $csv_data_header_count) {
+                       $csv_data_column_count_fail = TRUE;
+                     }
+                 }
+          //csv file seems to have a header only, force data column count failure
+          if (count($csv_data) <= 1) {
+              $csv_data_column_count_fail = TRUE;
+            }
+          //column count is ok
+          if (!$csv_data_column_count_fail) {
+              print(" [".ansi('green', 'ok')."]\n");
+              file_put_contents($log_file, "\n$time data column count vs header count check passed", FILE_APPEND | LOCK_EX);
+            }
+          //column count is not ok, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time data column count vs header count check failed", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
+
+          //check for empty cells
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking for empty cells in data rows");
+          $csv_data_empty_cells_fail = FALSE;
+          foreach ($csv_data as $csv_data_key => $csv_data_value) {
+                   if (preg_match("/[$csv_delimiter]{2,}/", $csv_data_value)) {
+                       $csv_data_empty_cells_fail = TRUE;
+                     }
+                 }
+          //no empty cells found
+          if (!$csv_data_empty_cells_fail) {
+              print(" [".ansi('green', 'ok')."]\n");
+              file_put_contents($log_file, "\n$time no empty cells found in data rows", FILE_APPEND | LOCK_EX);
+            }
+          //empty cells found, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time empty cells found in data rows", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
+
+          //display number of data rows to process
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   number of data rows to process");
+          $csv_data_rows_to_process = count($csv_data) - 1;
+          print(" [".ansi('green', "$csv_data_rows_to_process")."]\n");
+          file_put_contents($log_file, "\n$time $csv_data_rows_to_process data row(s) to process", FILE_APPEND | LOCK_EX);
+
+          //populate $csv_headers array from first line of csv data file
+          $csv_headers = array_map('trim', str_getcsv($csv_data[0], $csv_delimiter));
+
+          //populate associative $cbit_data array from csv data file, first line (header) is skipped
+          for ($row=1; $row < count($csv_data); $row++) {
+               $cbit_data[$row-1] = array_combine($csv_headers, array_map('trim', str_getcsv($csv_data[$row], $csv_delimiter)));
+             }
+        }
+      //csv file not found, exit
+      else {
+            $time = date('Y-m-d H:i:s');
+            print(substr($time, -8)." using $csv_file as source [".ansi('red', 'fail')."]\n");
+            print(substr($time, -8)."   $csv_file not found\n");
+            print(substr($time, -8)." exiting\n");
+            file_put_contents($log_file, "\n$time $csv_file not found", FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+            die();
+           }
+     }
+
+//skip mode enabled (this is the default)
+if (!isset($options['s'])) {
+    $skipmode = TRUE;
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." skip mode enabled (default, use -s to disable)\n");
+    file_put_contents($log_file, "\n$time skip mode enabled (default, use -s to disable)", FILE_APPEND | LOCK_EX);
+  }
+//skip mode disabled
+else {
+      $skipmode = FALSE;
+      $time = date('Y-m-d H:i:s');
+      print(substr($time, -8)." skip mode disabled via command line (-s)\n");
+      file_put_contents($log_file, "\n$time skip mode disabled via command line (-s)", FILE_APPEND | LOCK_EX);
+     }
+
+//reachability and version check
+$time = date('Y-m-d H:i:s');
+print(substr($time, -8)." ----------------------------------------\n");
+print(substr($time, -8)." checking ".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].") reachablility");
+list($cucm_version, $cucmdb_version, $curl_error, $http_code, $connect_time, $total_time) = get_cucm_version($cucmdb_supported_axl_apis, $cucm_profile, $cucm);
+
+//server is reachable
+if ($curl_error == 0) {
+    print(" [".ansi('green', 'ok')."]\n");
+    file_put_contents($log_file, "\n$time ".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].") is reachable", FILE_APPEND | LOCK_EX);
+
+    //check if axl api is responding and supported
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." checking if axl api is responding and supported");
+
+    //axl api is responding and supported
+    if (is_cucmdb_version_supported($cucmdb_supported_axl_apis, $cucmdb_version)) {
+        print(" [".ansi('green', 'ok')."]\n");
+        print(substr($time, -8)."   connect time: ".$connect_time."ms | total request time: ".$total_time."ms\n");
+        print(substr($time, -8)."   found cucm version: $cucm_version\n");
+        print(substr($time, -8)."     assuming cucm:db: $cucmdb_version [".ansi('green', 'supported')."]\n");
+        file_put_contents($log_file, "\n$time axl api is responding", FILE_APPEND | LOCK_EX);
+        file_put_contents($log_file, "\n$time connect time: ".$connect_time."ms | total request time: ".$total_time."ms", FILE_APPEND | LOCK_EX);
+        file_put_contents($log_file, "\n$time found cucm version: $cucm_version", FILE_APPEND | LOCK_EX);
+        file_put_contents($log_file, "\n$time assuming cucm:db: $cucmdb_version", FILE_APPEND | LOCK_EX);
+        file_put_contents($log_file, "\n$time cucm:db $cucmdb_version is supported", FILE_APPEND | LOCK_EX);
+      }
+    //axl api is not responding or not supported, exit
+    else {
+          print(" [".ansi('red', 'fail')."]\n");
+          print(substr($time, -8)." debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]\n");
+          print(substr($time, -8)." exiting\n");
+          file_put_contents($log_file, "\n$time axl api not responding or not supported", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+          die();
+         }
+
+    //check if we have templates configured
+    $time = date('Y-m-d H:i:s');
+    print(substr($time, -8)." looking for configured template(s)");
+    //we have configured templates
+    if (count($templates)) {
+        print(" [".ansi('green', count($templates)." configured")."]\n");
+        file_put_contents($log_file, "\n$time ".count($templates)." configured template(s): ".implode(', ', $templates), FILE_APPEND | LOCK_EX);
+        print(substr($time, -8)." checking for supported api version in template(s):\n");
+        print(substr($time, -8)."   cucm:db $cucmdb_version supports apis: ".implode(', ', $cucmdb_supported_axl_apis[$cucmdb_version])."\n");
+        foreach ($templates as $template) {
+                 print(substr($time, -8)."     $template");
+
+                 //template exists on disk
+                 if (file_exists($template)) {
+                     //read template from disk
+                     $template_file_content = file_get_contents($template);
+
+                     //extract version from template, set 'null' if we failed to extract it
+                     preg_match_all('/com\/axl\/api\/([0-9\.]*)/i', $template_file_content, $preg_match_all_result, PREG_PATTERN_ORDER);
+                     $template_file_version = strval($preg_match_all_result[1][0]);
+                     if (!$template_file_version) {
+                         $template_file_version = 'null';
+                       }
+
+                     //extract variables from template
+                     preg_match_all('/\[\[([a-zA-Z0-9\_\-]*)\]\]/', $template_file_content, $template_file_variables, PREG_PATTERN_ORDER);
+
+                     //replace one <tab> with two <whitespace>
+                     $template_file_content = str_replace('\t', '  ', $template_file_content);
+
+                     //store template version, content and variables in the template store
+                     $template_store[$template]['version'] = $template_file_version;
+                     $template_store[$template]['content'] = $template_file_content;
+                     $template_store[$template]['variables'] = array_unique($template_file_variables[1]);
+
+                     //check templates for unknown variables part one
+                     foreach ($template_store[$template]['variables'] as $template_variable) {
+                              if (!in_array($template_variable, $csv_headers)) {
+                                  $templates_with_unknown_variables[$template][] = $template_variable;
+                                }
+                            }
+
+                     //print and record version status
+                     if (in_array($template_file_version, $cucmdb_supported_axl_apis[$cucmdb_version])) {
+                         print(" | $template_file_version [".ansi('green', 'hit')."]\n");
+                       }
+                     else {
+                           print(" | $template_file_version [".ansi('red', 'miss')."]\n");
+                           $templates_with_unsupported_version[] = $template;
+                          }
+                   }
+                 //template does not exist on disk
+                 else {
+                       print(" [".ansi('red', 'not found')."]\n");
+                       $templates_missing[] = $template;
+                      }
+               }
+
+        //at least one of the configured templates is missing or has an api version set which is not supported by the cucm:db version detected
+        //in case of unsupported version, exit
+        //in case of missing template, exit
+        $time = date('Y-m-d H:i:s');
+        if (count($templates_with_unsupported_version)) {
+            print(substr($time, -8)." exiting\n");
+            file_put_contents($log_file, "\n$time ".count($templates_with_unsupported_version)." template(s) with unsupported api version: ".implode(', ', $templates_with_unsupported_version), FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+            die();
+          }
+        if (count($templates_missing)) {
+            print(substr($time, -8)." exiting\n");
+            file_put_contents($log_file, "\n$time ".count($templates_missing)." missing template(s): ".implode(', ', $templates_missing), FILE_APPEND | LOCK_EX);
+            file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+            die();
+          }
+
+        //check templates for unknown variables part two
+        $time = date('Y-m-d H:i:s');
+        print(substr($time, -8)." checking templates for unknown variables");
+        //no unknown variables found
+        if (!count($templates_with_unknown_variables)) {
+            print(" [".ansi('green', 'ok')."]\n");
+            file_put_contents($log_file, "\n$time no template has unknown variables", FILE_APPEND | LOCK_EX);
+          }
+        //unknown variables found, exit
+        else {
+              print(" [".ansi('red', 'fail')."]\n");
+              foreach ($templates_with_unknown_variables as $template_with_unknown_variables => $missing_variables) {
+                       $templates_with_unknown_variables_list[] = $template_with_unknown_variables;
+                       print(substr($time, -8)."   $template_with_unknown_variables\n");
+                       foreach ($missing_variables as $missing_variable) {
+                                print(substr($time, -8)."     $missing_variable\n");
+                              }
+                     }
+              print(substr($time, -8)." exiting\n");
+              file_put_contents($log_file, "\n$time ".count($templates_with_unknown_variables)." template(s) have unknown variables: ".implode(', ', $templates_with_unknown_variables_list), FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+              die();
+             }
+      }
+    //we don't have configured templates, exit
+    else {
+          print(" [".ansi('red', 'fail')."]\n");
+          print(substr($time, -8)." exiting\n");
+          file_put_contents($log_file, "\n$time no templates configured", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+          die();
+         }
+  }
+//server is not reachable, exit
+else {
+      print(" [".ansi('red', 'fail')."]\n");
+      $time = date('Y-m-d H:i:s');
+      print(substr($time, -8)." the following curl error occured: $curl_error\n");
+      print(substr($time, -8)." refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html\n");
+      print(substr($time, -8)." exiting\n");
+      file_put_contents($log_file, "\n$time exit with following curl error: $curl_error", FILE_APPEND | LOCK_EX);
+      file_put_contents($log_file, "\n$time refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html", FILE_APPEND | LOCK_EX);
+      file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+      die();
+     }
+
+//request green light from user to go ahead and start the work, else exit
+$time = date('Y-m-d H:i:s');
+print(substr($time, -8)." cbit is ready to start. ok to proceed? (y/[n])\n");
+$greenlight = fgets(STDIN);
+if (trim($greenlight) != 'y') {
+    print(substr($time, -8)." aborted by user\n");
+    file_put_contents($log_file, "\n$time $uname finish (aborted by user)\n", FILE_APPEND | LOCK_EX);
+    die();
+  }
+
+//if we come up to here we are ready to go
+$time = date('Y-m-d H:i:s');
+$start_time = time();
+print(substr($time, -8)." ----------------------------------------\n");
+print(substr($time, -8)." starting work\n");
+file_put_contents($log_file, "\n$time starting work", FILE_APPEND | LOCK_EX);
+
+//main loop, cycle through all configured templates
+foreach ($templates as $template) {
+         $time = date('Y-m-d H:i:s');
+         print(substr($time, -8)." working on template: $template\n");
+
+         //for every line we found in the csv file
+         for ($i=0; $i < count($cbit_data); $i++) {
+              //set date/time for this request
+              $time = date('Y-m-d H:i:s');
+              $counter = sprintf("%04d", $i+1);
+
+              //load the current template content from template store
+              $axl_request = $template_store[$template]['content'];
+
+              //cycle through all headers
+              foreach ($csv_headers as $header) {
+                       //replace all possible variables in the template with data from csv file
+                       //except when data from csv file is 'null', in that case we just remove the variable leaving '' (nothing)
+                       if ($cbit_data[$i][$header] != 'null') {
+                           $axl_request = str_replace("[[$header]]", $cbit_data[$i][$header], $axl_request);
+                         }
+                       else {
+                             $axl_request = str_replace("[[$header]]", '', $axl_request);
+                            }
+                     }
+              file_put_contents($log_file, "\n\n$time $counter ".$cbit_data[$i]['cbitId']." $template REQUEST\n", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, $axl_request, FILE_APPEND | LOCK_EX);
+
+              //if skip mode is disabled wipe $jobsfailed array on every iteration to force execution
+              if (!$skipmode) {
+                  $jobsfailed = array();
+                }
+
+              //only execute this request if there was no failure for the current cbitId
+              if (!in_array($cbit_data[$i]['cbitId'], $jobsfailed)) {
+                  //fire axl api call
+                  try {
+                       list($axl_response, $curl_error, $http_code, $connect_time, $total_time) = call_axl_api($axl_request, $template_store[$template]['version'], $cucm_profile[$cucm]['url'], $cucm_profile[$cucm]['user'], $cucm_profile[$cucm]['pass'], $cucm_profile[$cucm]['interface']);
+
+                       //parse server response for cucm answer
+                       $axl_response_xml = new SimpleXMLElement($axl_response);
+                       if (strstr($axl_response, 'soapenv:Fault')) {
+                           $cucm_answer = $axl_response_xml->xpath('//soapenv:Envelope/soapenv:Body/*/faultstring');
+                           $status_short = "[".ansi('red', 'fail')."]";
+                           $status_long = strval($cucm_answer[0]);
+                           $status_long_log = 'FAIL '.$status_long;
+                           $jobsummary[$cbit_data[$i]['cbitId']][] = array($template, $status_long);
+                           $jobsfailed[] = $cbit_data[$i]['cbitId'];
+                         }
+                       elseif (strstr($axl_response, 'SOAP-ENV:Fault')) {
+                               $cucm_answer = $axl_response_xml->xpath('//SOAP-ENV:Envelope/SOAP-ENV:Body/*/faultstring');
+                               $status_short = "[".ansi('red', 'fail')."]";
+                               $status_long = strval($cucm_answer[0]);
+                               $status_long_log = 'FAIL '.$status_long;
+                               $jobsummary[$cbit_data[$i]['cbitId']][] = array($template, $status_long);
+                               $jobsfailed[] = $cbit_data[$i]['cbitId'];
+                             }
+                       else {
+                             $cucm_answer = $axl_response_xml->xpath('//soapenv:Envelope/soapenv:Body/*/return');
+                             $status_short = "[".ansi('green', 'done')."]";
+                             $status_long = strval($cucm_answer[0]);
+                             $status_long_log = 'DONE '.$status_long;
+                            }
+
+                       //make cucm response human readable for log file
+                       $axl_response_pretty = new DOMDocument('1.0');
+                       $axl_response_pretty->preserveWhiteSpace = FALSE;
+                       $axl_response_pretty->formatOutput = TRUE;
+                       $axl_response_pretty->loadXML($axl_response_xml->asXML());
+                       $axl_response = $axl_response_pretty->saveXML();
+                      }
+                  catch (Exception $exception) {
+                         $status_short = "[".ansi('red', 'xcpt')."]";
+                         $status_long = $exception->getMessage()." | curl:$curl_error http:$http_code";
+                         $status_long_log = 'EXCEPTION '.$status_long;
+                         $jobsummary[$cbit_data[$i]['cbitId']][] = array($template, $status_long);
+                         $jobsfailed[] = $cbit_data[$i]['cbitId'];
+                       }
+                }
+              //we did not execute this request due to a previous failure for current cbitId 
+              else {
+                    $status_short = "[".ansi('yellow', 'skip')."]";
+                    $status_long = 'the request was skipped due to a previous failure.';
+                    $status_long_log = 'SKIP '.$status_long;
+                    $axl_response = "";
+                    $connect_time = 0;
+                    $total_time = 0;
+                   }
+
+              //print and log status
+              print(substr($time, -8)." $counter ".$cbit_data[$i]['cbitId']." $status_short ".$connect_time."ms/".$total_time."ms | $status_long\n");
+              file_put_contents($log_file, "\n$time $counter ".$cbit_data[$i]['cbitId']." $template RESPONSE ".$connect_time."ms/".$total_time."ms\n", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "$time $counter ".$cbit_data[$i]['cbitId']." $status_long_log\n", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "$time $counter ".$cbit_data[$i]['cbitId']." $template RAW RESPONSE\n", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, $axl_response, FILE_APPEND | LOCK_EX);
+            }
+       }
+
+//print job summary
+$end_time = time();
+$time = date('Y-m-d H:i:s');
+print(substr($time, -8)." ----------------------------------------\n");
+print(substr($time, -8)." ".count($jobsummary)." job(s) with errors/exceptions\n");
+ksort($jobsummary);
+foreach ($jobsummary as $job => $job_failed) {
+         print(substr($time, -8)." $job\n");
+         foreach ($job_failed as $failure) {
+                  print(substr($time, -8)."  $failure[0]\n");
+                  print(substr($time, -8)."    $failure[1]\n");
+                }
+       }
+print(substr($time, -8)." ----------------------------------------\n");
+
+//print job run time statistics
+$time = date('Y-m-d H:i:s');
+$job_minutes = ($end_time - $start_time) / 60 % 60;
+$job_seconds = ($end_time - $start_time) % 60;
+print(substr($time, -8)." execution time: ".$job_minutes."m ".$job_seconds."s\n");
+
+//rename logfile, exit
+$time = date('Y-m-d H:i:s');
+$logfile_timestamp = time();
+print(substr($time, -8)." renaming $log_file -> ".pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log\n");
+print(substr($time, -8)." exiting\n");
+file_put_contents($log_file, "\n$time renaming $log_file -> ".pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log\n", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "$time $uname finish\n", FILE_APPEND | LOCK_EX);
+rename($log_file, pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log");
+
+// end
+?>

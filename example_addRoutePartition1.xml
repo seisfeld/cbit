@@ -1,0 +1,11 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/9.1">
+<soapenv:Header/>
+	<soapenv:Body>
+		<ns:addRoutePartition>
+			<routePartition>
+				<name>[[cbitId]]_Xlate_PT</name>
+				<description>[[cbitId]] Site Specific Partition</description>
+			</routePartition>
+		</ns:addRoutePartition>
+	</soapenv:Body>
+</soapenv:Envelope>
