@@ -3,8 +3,6 @@ cbit
 
 _cucm bulk import tool_
 
-**Latest release: v1.21.1**
-
 #What do you need?
 
 * [Cisco Unified Communication Manager](http://www.cisco.com/c/en/us/products/unified-communications/unified-communications-manager-callmanager/index.html)
@@ -337,14 +335,6 @@ renaming cbit.log -> example.1388602800.log
 ```
 
 The filename is derived from the csv file name - given to `-f` - and the current unix time stamp to quickly build a rather unique name.
-
-#TODO
-
-There are a couple things which can be done to enhance _cbit_. In no particular order:
-
-* implement better error handling in case a SOAP request failed
-* porting to other programming languages
-* ...
 
 #The MIT License (MIT)
 
