@@ -59,6 +59,17 @@ function ansi($color, $message) {
               }
         }
 
+//function curl_error_text
+function curl_error_text($curlerror)
+        {
+         if (version_compare(PHP_VERSION, '5.5.0', '>=')) {
+             return "$curlerror (".curl_strerror($curlerror).")";
+           }
+         else {
+               return $curlerror;
+              }
+        }
+
 //function call_axl_api
 function call_axl_api($request, $version, $url, $user, $pass, $interface) {
          $soap_request = curl_init();
@@ -103,7 +114,7 @@ function get_cucm_version($axl_api_version_list, $cluster, $clusterid) {
 
                            //derive cucm:db version from detected cucm version
                            $detected_cucm_version_split = explode('.', $detected_cucm_version);
-                           $detected_cucmdb_version = $detected_cucm_version_split[0].".".$detected_cucm_version_split[1];
+                           $detected_cucmdb_version = $detected_cucm_version_split[0].'.'.$detected_cucm_version_split[1];
 
                            //we detected something, break foreach
                            break;
@@ -145,6 +156,26 @@ print(substr($time, -8)." $uname starting up\n");
 print(substr($time, -8)." use -h for help\n");
 print(substr($time, -8)." using $log_file to log messages\n");
 file_put_contents($log_file, "\n$time $uname start", FILE_APPEND | LOCK_EX);
+
+//check for required modules
+$time = date('Y-m-d H:i:s');
+print(substr($time, -8)." checking for required modules\n");
+file_put_contents($log_file, "\n$time checking for required modules", FILE_APPEND | LOCK_EX);
+print(substr($time, -8)."   curl");
+//curl module found
+if (function_exists('curl_init')) {
+    print(" [".ansi('green', 'ok')."]\n");
+    file_put_contents($log_file, "\n$time curl module found", FILE_APPEND | LOCK_EX);
+  }
+//curl module not found, exit
+else {
+      print(" [".ansi('red', 'fail')."]\n");
+      $time = date('Y-m-d H:i:s');
+      print(substr($time, -8)." exiting\n");
+      file_put_contents($log_file, "\n$time curl module not found", FILE_APPEND | LOCK_EX);
+      file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+      die();
+     }
 
 //parse command line arguments
 $options = getopt('f:b::csh');
@@ -286,11 +317,9 @@ if (isset($options['b'])) {
     else {
           print(" [".ansi('red', 'fail')."]\n");
           $time = date('Y-m-d H:i:s');
-          print(substr($time, -8)." the following curl error occured: $curl_error\n");
-          print(substr($time, -8)." refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html\n");
+          print(substr($time, -8)." the following curl error occured: ".curl_error_text($curl_error)."\n");
           print(substr($time, -8)." exiting\n");
-          file_put_contents($log_file, "\n$time exit with following curl error: $curl_error", FILE_APPEND | LOCK_EX);
-          file_put_contents($log_file, "\n$time refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html", FILE_APPEND | LOCK_EX);
+          file_put_contents($log_file, "\n$time the following curl error occured: ".curl_error_text($curl_error), FILE_APPEND | LOCK_EX);
           file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
           die();
          }
@@ -342,8 +371,8 @@ else {
           //check for cbitId in header
           $time = date('Y-m-d H:i:s');
           print(substr($time, -8)."   checking for cbitId in header");
-          if (in_array("cbitId", str_getcsv($csv_data[0], $csv_delimiter))) {
-              print(" [".ansi('green', "ok")."]\n");
+          if (in_array('cbitId', str_getcsv($csv_data[0], $csv_delimiter))) {
+              print(" [".ansi('green', 'ok')."]\n");
               file_put_contents($log_file, "\n$time cbitId found in header", FILE_APPEND | LOCK_EX);
             }
           //cbitId not found in header, exit
@@ -633,11 +662,9 @@ if ($curl_error == 0) {
 else {
       print(" [".ansi('red', 'fail')."]\n");
       $time = date('Y-m-d H:i:s');
-      print(substr($time, -8)." the following curl error occured: $curl_error\n");
-      print(substr($time, -8)." refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html\n");
+      print(substr($time, -8)." the following curl error occured: ".curl_error_text($curl_error)."\n");
       print(substr($time, -8)." exiting\n");
-      file_put_contents($log_file, "\n$time exit with following curl error: $curl_error", FILE_APPEND | LOCK_EX);
-      file_put_contents($log_file, "\n$time refer to http://curl.haxx.se/libcurl/c/libcurl-errors.html", FILE_APPEND | LOCK_EX);
+      file_put_contents($log_file, "\n$time the following curl error occured: ".curl_error_text($curl_error), FILE_APPEND | LOCK_EX);
       file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
       die();
      }
@@ -732,13 +759,13 @@ foreach ($templates as $template) {
                       }
                   catch (Exception $exception) {
                          $status_short = "[".ansi('red', 'xcpt')."]";
-                         $status_long = $exception->getMessage()." | curl:$curl_error http:$http_code";
+                         $status_long = $exception->getMessage()." | curl: ".curl_error_text($curl_error).", http: $http_code";
                          $status_long_log = 'EXCEPTION '.$status_long;
                          $jobsummary[$cbit_data[$i]['cbitId']][] = array($template, $status_long);
                          $jobsfailed[] = $cbit_data[$i]['cbitId'];
                        }
                 }
-              //we did not execute this request due to a previous failure for current cbitId 
+              //we did not execute this request due to a previous failure for current cbitId
               else {
                     $status_short = "[".ansi('yellow', 'skip')."]";
                     $status_long = 'the request was skipped due to a previous failure.';
