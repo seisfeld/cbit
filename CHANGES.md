@@ -1,5 +1,11 @@
 #cbit change log
 
+##v1.22.0
+* adding curl module detection on startup
+* adding detailed curl error messages (on php versions >= 5.5.0)
+* removing link to explain curl errors when showing curls error code again
+* code cleanup
+
 ##v1.21.1
 * fixed bug in get_cucm_version()
 
@@ -7,7 +13,7 @@
 * fixed bug in name space declaration of getCCMVersion request
 * made cucm version detection more robust
 * added debug info at certain exit points
-* added "_" (underscrore) and "-" (dash/hyphen) to the list of allowed characters for variable names
+* added "_" (underscore) and "-" (dash/hyphen) to the list of allowed characters for variable names
 * added check for duplicates in csv header
 * added check for cbitId in csv header
 * added display of password back to -c option

@@ -157,9 +157,11 @@ Once you have completed all your templates and your `cbit_config.h` file you can
 
  ```
 $ ./cbit -h
-20:00:00 cbit v1.21.1 starting up
+20:00:00 cbit v1.22.0 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
+20:00:00 checking for required modules
+20:00:00   curl [ok]
 20:00:00 available command line options:
 20:00:00
 20:00:00 -h display this help
@@ -172,7 +174,7 @@ $ ./cbit -h
 20:00:00
 20:00:00 The MIT License (MIT) - see LICENSE file
 20:00:00
-20:00:00 cbit v1.21.1 Copyright (c) 2014-2015 Stephan Eisfeld
+20:00:00 cbit v1.22.0 Copyright (c) 2014-2015 Stephan Eisfeld
 20:00:00
 20:00:00 exiting
 ```
@@ -181,9 +183,11 @@ $ ./cbit -h
 
  ```
 $ ./cbit -c
-20:00:00 cbit v1.21.1 starting up
+20:00:00 cbit v1.22.0 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
+20:00:00 checking for required modules
+20:00:00   curl [ok]
 20:00:00 dumping config
 20:00:00 user:pass@https://x.x.x.x:8443/axl/ (my cucm)
 20:00:00 outgoing interface: interface
@@ -197,9 +201,11 @@ $ ./cbit -c
 
  ```
 $ ./cbit -fexample.csv
-20:00:00 cbit v1.21.1 starting up
+20:00:00 cbit v1.22.0 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
+20:00:00 checking for required modules
+20:00:00   curl [ok]
 20:00:00 using example.csv as source [ok]
 20:00:00   checking for valid header [2 columns]
 20:00:00   checking for cbitId in header [ok]
@@ -300,9 +306,11 @@ y
 
  ```
 $ ./cbit -b5
-20:00:00 cbit v1.21.1 starting up
+20:00:00 cbit v1.22.0 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
+20:00:00 checking for required modules
+20:00:00   curl [ok]
 20:00:00 checking https://x.x.x.x:8443/axl/ (my cucm) reachablility [ok]
 20:00:00 checking if axl api is responding and supported [ok]
 20:00:00   connect time: 5ms | total request time: 50ms
