@@ -69,6 +69,8 @@ SiteB;10.10.20.1
 SiteC;10.10.30.1
 ```
 
+**IMPORTANT**: By default, _cbit_ uses `;` (semicolon) as delimiter for the csv files. This can be changed to `,` (comma) in the config file `cbit_config.h` if necessary. Other delimiters are not supported!
+
 -
 
 Now let's look a little closer at the first template. The first line always has to contain the AXL API version of the CUCM _cbit_ talks to. The important part is within the name space declaration: `xmlns:ns="http://www.cisco.com/AXL/API/9.1"` In this case we instruct to use AXL API verion **9.1**. _cbit_ will read this information and will check if the version of the CUCM it talks to supports this AXL API version. It will also tell you what older AXL API versions you can use with your version of CUCM (usefull in case you want to reuse older templates after you did upgrade your CUCM).
@@ -87,7 +89,7 @@ Maybe you did spot the words in double square brackets `[[` and `]]` in the temp
 
 **IMPORTANT:** There is one **mandatory variable** that needs to be in every csv file: `cbitId`. This one is used internally by _cbit_ to display progress and error reports. You can populate this variable how you want, but a name that represents the dataset of the given csv line is recommended. In the example we use site names (SiteA, SiteB & SiteC). Depending on the type of the job you run, other examples might be userids, DNs or if you can't think of anything just use a running number. You are not required to use **cbitId** within your templates (since it's only mandatory to be in the csv file) but you can if you want to. In the example it is used in the templates to show the recommended practice.
 
-In the csv file you have a header in the first line, where you can find the same **variables** just without the brackets. In this case we have `cbitId;cbitSrst1Ip` followed by the actual data for three sites. The identifier of the site and the ip used for the srst reference, one site per line. By default, _cbit_ uses `;` as seperator for the csv files. This can be changed in the config file `cbit_config.h` if necessary.
+In the csv file you have a header in the first line, where you can find the same **variables** just without the brackets. In this case we have `cbitId;cbitSrst1Ip` followed by the actual data for three sites. The identifier of the site and the ip used for the srst reference, one site per line.
 
 -
 
@@ -191,6 +193,7 @@ $ ./cbit -c
 20:00:00 dumping config
 20:00:00 user:pass@https://x.x.x.x:8443/axl/ (my cucm)
 20:00:00 outgoing interface: interface
+20:00:00 csv delimiter: ;
 20:00:00 2 template(s) configured
 20:00:00   example_addSrst1.xml | 9.1 [found]
 20:00:00   example_addRoutePartition1.xml | 9.1 [found]
@@ -227,8 +230,7 @@ $ ./cbit -fexample.csv
 20:00:00     example_addSrst1.xml | 9.1 [hit]
 20:00:00     example_addRoutePartition1.xml | 9.1 [hit]
 20:00:00 checking templates for unknown variables [ok]
-20:00:00 cbit is ready to start. ok to proceed? (y/[n])
-y
+20:00:00 cbit is ready to start. ok to proceed? (y/[n]): y
 20:00:00 ----------------------------------------
 20:00:00 starting bulk import
 20:00:00 working on template: example_addSrst1.xml
@@ -278,8 +280,7 @@ y
  If every check passed successfully up to this point, _cbit_ asks the user if he is ok to proceed with the actual work:
 
  ```
-20:00:00 cbit is ready to start. ok to proceed? (y/[n])
-y
+20:00:00 cbit is ready to start. ok to proceed? (y/[n]): y
 20:00:00 ----------------------------------------
 20:00:00 starting bulk import
 20:00:00 working on template: example_addSrst1.xml
