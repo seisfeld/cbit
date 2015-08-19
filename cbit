@@ -49,25 +49,15 @@ function ansi($color, $message) {
          $ansicolor['red'] = 31;
          $ansicolor['green'] = 32;
          $ansicolor['yellow'] = 33;
-         //we run on windows, don't return any ansi colors
-         if (strncasecmp(PHP_OS, 'WIN', 3) == 0) {
-             return $message;
-           }
-         //we don't run on windows
-         else {
-               return "\e[".$ansicolor[$color]."m".$message."\e[0m";
-              }
+
+         //if we don't run on windows, return an ansi colored message
+         return (!strncasecmp(PHP_OS, 'WIN', 3) == 0) ? "\e[".$ansicolor[$color]."m".$message."\e[0m" : $message;
         }
 
 //function curl_error_text
-function curl_error_text($curlerror)
-        {
-         if (version_compare(PHP_VERSION, '5.5.0', '>=')) {
-             return "$curlerror (".curl_strerror($curlerror).")";
-           }
-         else {
-               return $curlerror;
-              }
+function curl_error_text($curlerror) {
+         //if the running PHP version supports it, return a human readable curl error message
+         return version_compare(PHP_VERSION, '5.5.0', '>=') ? "$curlerror (".curl_strerror($curlerror).")" : $curlerror;
         }
 
 //function call_axl_api
@@ -137,12 +127,8 @@ function get_cucm_version($axl_api_version_list, $cluster, $clusterid) {
 
 //function is_cucmdb_version_supported
 function is_cucmdb_version_supported($supported_axl_apis, $version) {
-         if (array_key_exists($version, $supported_axl_apis)) {
-             return TRUE;
-           }
-         else {
-               return FALSE;
-              }
+         //if the cucm:db version is supported, return TRUE
+         return array_key_exists($version, $supported_axl_apis) ? TRUE : FALSE;
         }
 
 //if the log file already exists, delete it
@@ -160,7 +146,6 @@ file_put_contents($log_file, "\n$time $uname start", FILE_APPEND | LOCK_EX);
 //check for required modules
 $time = date('Y-m-d H:i:s');
 print(substr($time, -8)." checking for required modules\n");
-file_put_contents($log_file, "\n$time checking for required modules", FILE_APPEND | LOCK_EX);
 print(substr($time, -8)."   curl");
 //curl module found
 if (function_exists('curl_init')) {
@@ -209,6 +194,7 @@ if (isset($options['c'])) {
     print(substr($time, -8)." dumping config\n");
     print(substr($time, -8)." ".$cucm_profile[$cucm]['user'].":".$cucm_profile[$cucm]['pass']."@".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].")\n");
     print(substr($time, -8)." outgoing interface: ".$cucm_profile[$cucm]['interface']."\n");
+    print(substr($time, -8)." csv delimiter: $csv_delimiter\n");
     print(substr($time, -8)." ".count($templates)." template(s) configured\n");
     foreach ($templates as $template) {
              print(substr($time, -8)."   $template");
@@ -542,7 +528,8 @@ if ($curl_error == 0) {
     //axl api is not responding or not supported, exit
     else {
           print(" [".ansi('red', 'fail')."]\n");
-          print(substr($time, -8)." debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]\n");
+          print(substr($time, -8)."   axl api not responding or not supported\n");
+          print(substr($time, -8)."   debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]\n");
           print(substr($time, -8)." exiting\n");
           file_put_contents($log_file, "\n$time axl api not responding or not supported", FILE_APPEND | LOCK_EX);
           file_put_contents($log_file, "\n$time debug info: [$cucm_version]-[$cucmdb_version]-[$curl_error]-[$http_code]-[$connect_time]-[$total_time]", FILE_APPEND | LOCK_EX);
@@ -671,7 +658,7 @@ else {
 
 //request green light from user to go ahead and start the work, else exit
 $time = date('Y-m-d H:i:s');
-print(substr($time, -8)." cbit is ready to start. ok to proceed? (y/[n])\n");
+print(substr($time, -8)." cbit is ready to start. ok to proceed? (y/[n]): ");
 $greenlight = fgets(STDIN);
 if (trim($greenlight) != 'y') {
     print(substr($time, -8)." aborted by user\n");
