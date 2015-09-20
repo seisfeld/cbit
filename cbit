@@ -131,6 +131,21 @@ function is_cucmdb_version_supported($supported_axl_apis, $version) {
          return array_key_exists($version, $supported_axl_apis) ? TRUE : FALSE;
         }
 
+//function detect_csv_delimiter
+function detect_csv_delimiter($csv_data) {
+         $csv_delimiters = array(';', ',');
+         $csv_delimiters_results = array(array(), array());
+         foreach ($csv_delimiters as $delimiter_key => $delimiter) {         
+                  foreach ($csv_data as $csv_key => $csv) {
+                           $csv_delimiters_results[$delimiter_key][$csv_key] = count(preg_split('/['.$delimiter.']/', $csv)) - 1;
+                         }
+                  $csv_delimiters_results[$delimiter_key] = array_sum($csv_delimiters_results[$delimiter_key]) / count($csv_delimiters_results[$delimiter_key]);
+                }
+         arsort($csv_delimiters_results);
+         reset($csv_delimiters_results);
+         return ($csv_delimiters_results[0] !== $csv_delimiters_results[1]) ? $csv_delimiters[key($csv_delimiters_results)] : $csv_delimiters[0];
+        }
+
 //if the log file already exists, delete it
 if (file_exists($log_file)) {
     unlink($log_file);
@@ -336,6 +351,28 @@ else {
           foreach ($csv_data as $csv_data_key => $csv_data_value) {
                    $csv_data[$csv_data_key] = trim($csv_data[$csv_data_key]);
                  }
+
+          //detect and compare csv delimiter
+          $time = date('Y-m-d H:i:s');
+          print(substr($time, -8)."   checking csv delimiter");
+          $detected_csv_delimiter = detect_csv_delimiter($csv_data);
+          if ($csv_delimiter == $detected_csv_delimiter) {
+              print(" [".ansi('green', 'ok')."]\n");
+              print(substr($time, -8)."     configured: $csv_delimiter\n");
+              print(substr($time, -8)."       detected: $detected_csv_delimiter\n");
+              file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+            }
+          //seems we have a delimiter missmatch, exit
+          else {
+                print(" [".ansi('red', 'fail')."]\n");
+                print(substr($time, -8)."     configured: $csv_delimiter\n");
+                print(substr($time, -8)."       detected: $detected_csv_delimiter\n");
+                print(substr($time, -8)." exiting\n");
+                file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time csv delimiter missmatch", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+                die();
+               }
 
           //check for valid header
           $time = date('Y-m-d H:i:s');

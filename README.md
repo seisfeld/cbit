@@ -210,6 +210,9 @@ $ ./cbit -fexample.csv
 20:00:00 checking for required modules
 20:00:00   curl [ok]
 20:00:00 using example.csv as source [ok]
+20:00:00   checking csv delimiter [ok]
+20:00:00     configured: ;
+20:00:00       detected: ;
 20:00:00   checking for valid header [2 columns]
 20:00:00   checking for cbitId in header [ok]
 20:00:00   checking for duplicates in header [ok]

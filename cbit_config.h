@@ -21,6 +21,7 @@ $templates[] = 'example_addRoutePartition1.xml';
 $log_file = 'cbit.log';
 
 //use the following character as csv delimiter
+//supported delimiters are ';' (semicolon) and ',' (comma)
 //only change if you know what you are doing!
 $csv_delimiter=';';
 
