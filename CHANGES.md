@@ -1,5 +1,11 @@
 #cbit change log
 
+##v1.23.0
+* simplifying functions ansi(), curl_error_text() and is_cucmdb_version_supported()
+* adding display of configured csv delimiter to -c option
+* adding csv delimiter check on startup
+* minor interface tweaks
+
 ##v1.22.0
 * adding curl module detection on startup
 * adding detailed curl error messages (on php versions >= 5.5.0)
