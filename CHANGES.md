@@ -1,5 +1,14 @@
 #cbit change log
 
+##r24
+* adding summary output to log file
+* adding job run time statistics to log file
+* adding csv delimiter override option when csv delimiter missmatch is detected
+* minor log file tweaks
+* minor documentation changes
+* changing version numbering to release numbers (rXX)
+* code cleanup
+
 ##v1.23.0
 * simplifying functions ansi(), curl_error_text() and is_cucmdb_version_supported()
 * adding display of configured csv delimiter to -c option

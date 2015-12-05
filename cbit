@@ -3,7 +3,7 @@
 //cbit - cucm bulk import tool
 
 //name and version
-$uname = 'cbit v1.23.0';
+$uname = 'cbit r24';
 
 //define some arrays
 $templates = array();
@@ -135,7 +135,7 @@ function is_cucmdb_version_supported($supported_axl_apis, $version) {
 function detect_csv_delimiter($csv_data) {
          $csv_delimiters = array(';', ',');
          $csv_delimiters_results = array(array(), array());
-         foreach ($csv_delimiters as $delimiter_key => $delimiter) {         
+         foreach ($csv_delimiters as $delimiter_key => $delimiter) {
                   foreach ($csv_data as $csv_key => $csv) {
                            $csv_delimiters_results[$delimiter_key][$csv_key] = count(preg_split('/['.$delimiter.']/', $csv)) - 1;
                          }
@@ -362,16 +362,29 @@ else {
               print(substr($time, -8)."       detected: $detected_csv_delimiter\n");
               file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
             }
-          //seems we have a delimiter missmatch, exit
+          //seems we have a delimiter missmatch, ask user how to proceed
           else {
                 print(" [".ansi('red', 'fail')."]\n");
-                print(substr($time, -8)."     configured: $csv_delimiter\n");
-                print(substr($time, -8)."       detected: $detected_csv_delimiter\n");
-                print(substr($time, -8)." exiting\n");
+                print(substr($time, -8)."              configured: $csv_delimiter\n");
+                print(substr($time, -8)."                detected: $detected_csv_delimiter\n");
                 file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
-                file_put_contents($log_file, "\n$time csv delimiter missmatch", FILE_APPEND | LOCK_EX);
-                file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
-                die();
+                file_put_contents($log_file, "\n$time csv delimiter missmatch, asking for override", FILE_APPEND | LOCK_EX);
+
+                //request green light from user to go ahead and use detected csv delimiter, else exit
+                print(substr($time, -8)."   use detected? (y/[n]): ");
+                $greenlight = fgets(STDIN);
+                if (trim($greenlight) != 'y') {
+                    $time = date('Y-m-d H:i:s');
+                    print(substr($time, -8)." aborted by user\n");
+                    file_put_contents($log_file, "\n$time $uname finish (aborted by user)\n", FILE_APPEND | LOCK_EX);
+                    die();
+                  }
+                else {
+                      $csv_delimiter = $detected_csv_delimiter;
+                      $time = date('Y-m-d H:i:s');
+                      print(substr($time, -8)."                   using: $detected_csv_delimiter\n");
+                      file_put_contents($log_file, "\n$time csv delimiter overridden by user, using detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+                     }
                }
 
           //check for valid header
@@ -538,6 +551,7 @@ else {
 //reachability and version check
 $time = date('Y-m-d H:i:s');
 print(substr($time, -8)." ----------------------------------------\n");
+file_put_contents($log_file, "\n$time ----------------------------------------", FILE_APPEND | LOCK_EX);
 print(substr($time, -8)." checking ".$cucm_profile[$cucm]['url']." (".$cucm_profile[$cucm]['description'].") reachablility");
 list($cucm_version, $cucmdb_version, $curl_error, $http_code, $connect_time, $total_time) = get_cucm_version($cucmdb_supported_axl_apis, $cucm_profile, $cucm);
 
@@ -698,17 +712,19 @@ $time = date('Y-m-d H:i:s');
 print(substr($time, -8)." cbit is ready to start. ok to proceed? (y/[n]): ");
 $greenlight = fgets(STDIN);
 if (trim($greenlight) != 'y') {
+    $time = date('Y-m-d H:i:s');
     print(substr($time, -8)." aborted by user\n");
     file_put_contents($log_file, "\n$time $uname finish (aborted by user)\n", FILE_APPEND | LOCK_EX);
     die();
   }
 
-//if we come up to here we are ready to go
+//if we come up to here, we are ready to go
 $time = date('Y-m-d H:i:s');
 $start_time = time();
 print(substr($time, -8)." ----------------------------------------\n");
 print(substr($time, -8)." starting work\n");
-file_put_contents($log_file, "\n$time starting work", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "\n$time ----------------------------------------", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "\n$time user gave permission to go ahead, starting work", FILE_APPEND | LOCK_EX);
 
 //main loop, cycle through all configured templates
 foreach ($templates as $template) {
@@ -813,29 +829,36 @@ $end_time = time();
 $time = date('Y-m-d H:i:s');
 print(substr($time, -8)." ----------------------------------------\n");
 print(substr($time, -8)." ".count($jobsummary)." job(s) with errors/exceptions\n");
+file_put_contents($log_file, "\n$time ----------------------------------------", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "\n$time ".count($jobsummary)." job(s) with errors/exceptions", FILE_APPEND | LOCK_EX);
 ksort($jobsummary);
 foreach ($jobsummary as $job => $job_failed) {
          print(substr($time, -8)." $job\n");
+         file_put_contents($log_file, "\n$time $job", FILE_APPEND | LOCK_EX);
          foreach ($job_failed as $failure) {
                   print(substr($time, -8)."  $failure[0]\n");
                   print(substr($time, -8)."    $failure[1]\n");
+                  file_put_contents($log_file, "\n$time   $failure[0]", FILE_APPEND | LOCK_EX);
+                  file_put_contents($log_file, "\n$time     $failure[1]", FILE_APPEND | LOCK_EX);
                 }
        }
 print(substr($time, -8)." ----------------------------------------\n");
+file_put_contents($log_file, "\n$time ----------------------------------------", FILE_APPEND | LOCK_EX);
 
 //print job run time statistics
 $time = date('Y-m-d H:i:s');
 $job_minutes = ($end_time - $start_time) / 60 % 60;
 $job_seconds = ($end_time - $start_time) % 60;
 print(substr($time, -8)." execution time: ".$job_minutes."m ".$job_seconds."s\n");
+file_put_contents($log_file, "\n$time execution time: ".$job_minutes."m ".$job_seconds."s", FILE_APPEND | LOCK_EX);
 
 //rename logfile, exit
 $time = date('Y-m-d H:i:s');
 $logfile_timestamp = time();
 print(substr($time, -8)." renaming $log_file -> ".pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log\n");
 print(substr($time, -8)." exiting\n");
-file_put_contents($log_file, "\n$time renaming $log_file -> ".pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log\n", FILE_APPEND | LOCK_EX);
-file_put_contents($log_file, "$time $uname finish\n", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "\n$time renaming $log_file -> ".pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log", FILE_APPEND | LOCK_EX);
+file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
 rename($log_file, pathinfo($csv_file, PATHINFO_FILENAME).".$logfile_timestamp.log");
 
 // end
