@@ -29,12 +29,12 @@ $cucmdb_supported_axl_apis['6.0'] = array('6.0');
 //always display time in UTC
 date_default_timezone_set('UTC');
 
-//require cbit_config.h, exit if not found
-if (file_exists('cbit_config.h')) {
-    require 'cbit_config.h';
+//require cbit_config, exit if not found
+if (file_exists('cbit_config')) {
+    require 'cbit_config';
   }
 else {
-      print("$uname. cbit_config.h not found. exiting.\n");
+      print("$uname. cbit_config not found. exiting.\n");
       die();
      }
 
@@ -195,7 +195,7 @@ if (isset($options['h'])) {
     print(substr($time, -8)."\n");
     print(substr($time, -8)." The MIT License (MIT) - see LICENSE file\n");
     print(substr($time, -8)."\n");
-    print(substr($time, -8)." $uname Copyright (c) 2014-2015 Stephan Eisfeld\n");
+    print(substr($time, -8)." $uname Copyright (c) 2014-2016 Stephan Eisfeld\n");
     print(substr($time, -8)."\n");
     print(substr($time, -8)." exiting\n");
     file_put_contents($log_file, "\n$time displaying help", FILE_APPEND | LOCK_EX);
