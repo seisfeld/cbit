@@ -29,6 +29,7 @@ First, let's have a look at the example files included:
 
 ##example_addSrst1.xml
 This is an example to add a srst reference to the CUCM:
+
 ```
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/9.1">
 <soapenv:Header/>
@@ -46,6 +47,7 @@ This is an example to add a srst reference to the CUCM:
 
 ##example_addRoutePartition1.xml
 This is an example to add a route partition to the CUCM:
+
 ```
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/9.1">
 <soapenv:Header/>
@@ -62,6 +64,7 @@ This is an example to add a route partition to the CUCM:
 
 ##example.csv
 This is an example csv where the variable data comes from:
+
 ```
 cbitId;cbitSrst1Ip
 SiteA;10.10.10.1
@@ -69,7 +72,7 @@ SiteB;10.10.20.1
 SiteC;10.10.30.1
 ```
 
-**IMPORTANT**: By default, _cbit_ uses `;` (semicolon) as delimiter for the csv files. This can be changed to `,` (comma) in the config file `cbit_config.h` if necessary. Other delimiters are not supported!
+**IMPORTANT**: By default, _cbit_ uses `;` (semicolon) as delimiter for the csv files. This can be changed to `,` (comma) in the config file `cbit_config` if necessary. Other delimiters are not supported!
 
 -
 
@@ -117,7 +120,7 @@ That way you can chain as many different templates as you would like and merge t
 
 ##Configuration
 
-_cbit_ uses a config file called `cbit_config.h` which needs to be placed in the same directory as the main script. There are three main parts that you need to configure before you can use _cbit_.
+_cbit_ uses a config file called `cbit_config` which needs to be placed in the same directory as the main script. There are three main parts that you need to configure before you can use _cbit_.
 
 1. You need to configure at least one profile which describes how your CUCM is reached. You can configure more than one if you need to:
 
@@ -147,11 +150,11 @@ $templates[] = 'example_addSrst1.xml';
 $templates[] = 'example_addRoutePartition1.xml';
 ```
 
-You usually don't need to tamper with the rest of the `cbit_config.h` file.
+You usually don't need to tamper with the rest of the `cbit_config` file.
 
 ##Running the script
 
-Once you have completed all your templates and your `cbit_config.h` file you can run _cbit_.
+Once you have completed all your templates and your `cbit_config` file you can run _cbit_.
 
 ###Command line options
 
@@ -176,7 +179,7 @@ $ ./cbit -h
 20:00:00
 20:00:00 The MIT License (MIT) - see LICENSE file
 20:00:00
-20:00:00 cbit r24 Copyright (c) 2014-2015 Stephan Eisfeld
+20:00:00 cbit r24 Copyright (c) 2014-2016 Stephan Eisfeld
 20:00:00
 20:00:00 exiting
 ```
@@ -254,7 +257,7 @@ $ ./cbit -fexample.csv
 
  We passed `-fexample.csv` which tells _cbit_ to use `example.csv` as source. It then does various checks like: Does the source file actually exist (again, needs to be in the same directory as the script itself), a couple sanity checks with the source file and a reachability check of the cucm server.
 
- Once that is passed, it immediately checks if the AXL API is responding or not. Make sure the user you supplied in your `cbit_config.h` has sufficient rights to use CUCM's AXL API and that the AXL API related services are actually running. These are:
+ Once that is passed, it immediately checks if the AXL API is responding or not. Make sure the user you supplied in your `cbit_config` has sufficient rights to use CUCM's AXL API and that the AXL API related services are actually running. These are:
  * Cisco Bulk Provisioning Service
  * Cisco AXL Web Service
 
@@ -333,7 +336,7 @@ $ ./cbit -b5
 
 ##The log file
 
-_cbit_ writes a quite verbose log file everytime you run it. The default name is `cbit.log` but this can be changed in the config file `cbit_config.h`:
+_cbit_ writes a quite verbose log file everytime you run it. The default name is `cbit.log` but this can be changed in the config file `cbit_config`:
 
 ```
 //use the following file as log file
@@ -350,7 +353,7 @@ The filename is derived from the csv file name - given to `-f` - and the current
 
 #The MIT License (MIT)
 
-**Copyright (c) 2014-2015 Stephan Eisfeld**
+**Copyright (c) 2014-2016 Stephan Eisfeld**
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

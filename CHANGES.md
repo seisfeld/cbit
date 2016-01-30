@@ -1,5 +1,11 @@
 #cbit change log
 
+##r25
+* updating README.md
+* renaming cbit_config.h to cbit_config
+* changing the year in copyright line in all files
+* adding newline at the end of all files
+
 ##r24
 * adding summary output to log file
 * adding job run time statistics to log file
