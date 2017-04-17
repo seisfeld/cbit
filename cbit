@@ -3,7 +3,7 @@
 //cbit - cucm bulk import tool
 
 //name and version
-$uname = 'cbit r25';
+$uname = 'cbit r26';
 
 //define some arrays
 $templates = array();
