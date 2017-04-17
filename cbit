@@ -12,6 +12,7 @@ $templates_with_unsupported_version = array();
 $templates_with_unknown_variables = array();
 $jobsummary = array();
 $jobsfailed = array();
+$supported_csv_delimiters = array(';', ',');
 
 //which cucm:db version supports which axl api version(s)
 $cucmdb_supported_axl_apis['10.5'] = array('10.5', '10.0', '9.1', '9.0', '8.5', '8.0');
@@ -132,9 +133,9 @@ function is_cucmdb_version_supported($supported_axl_apis, $version) {
         }
 
 //function detect_csv_delimiter
-function detect_csv_delimiter($csv_data) {
-         $csv_delimiters = array(';', ',');
+function detect_csv_delimiter($csv_data, $csv_delimiters) {
          $csv_delimiters_results = array(array(), array());
+         //look for supported csv delimiters in csv data, return csv delimiter with highest probability
          foreach ($csv_delimiters as $delimiter_key => $delimiter) {
                   foreach ($csv_data as $csv_key => $csv) {
                            $csv_delimiters_results[$delimiter_key][$csv_key] = count(preg_split('/['.$delimiter.']/', $csv)) - 1;
@@ -195,7 +196,7 @@ if (isset($options['h'])) {
     print(substr($time, -8)."\n");
     print(substr($time, -8)." The MIT License (MIT) - see LICENSE file\n");
     print(substr($time, -8)."\n");
-    print(substr($time, -8)." $uname Copyright (c) 2014-2016 Stephan Eisfeld\n");
+    print(substr($time, -8)." $uname Copyright (c) 2014-2017 Stephan Eisfeld\n");
     print(substr($time, -8)."\n");
     print(substr($time, -8)." exiting\n");
     file_put_contents($log_file, "\n$time displaying help", FILE_APPEND | LOCK_EX);
@@ -352,23 +353,39 @@ else {
                    $csv_data[$csv_data_key] = trim($csv_data[$csv_data_key]);
                  }
 
-          //detect and compare csv delimiter
+          //detect, validate and compare csv delimiter
           $time = date('Y-m-d H:i:s');
           print(substr($time, -8)."   checking csv delimiter");
-          $detected_csv_delimiter = detect_csv_delimiter($csv_data);
+          //check if the configured csv delimiter is supported
+          if (!in_array($csv_delimiter, $supported_csv_delimiters)) {
+              print(" [".ansi('red', 'fail')."]\n");
+              print(substr($time, -8)."     configured: $csv_delimiter\n");
+              print(substr($time, -8)."      supported: ".implode(' ', $supported_csv_delimiters)."\n");
+              print(substr($time, -8)." exiting\n");
+              file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time supported csv delimiters: ".implode(' ', $supported_csv_delimiters), FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time configured csv delimiter not supported", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time $uname finish\n", FILE_APPEND | LOCK_EX);
+              die();
+            }
+          //check if the configured csv delimiter matches the detected csv delimiter
+          $detected_csv_delimiter = detect_csv_delimiter($csv_data, $supported_csv_delimiters);
           if ($csv_delimiter == $detected_csv_delimiter) {
               print(" [".ansi('green', 'ok')."]\n");
               print(substr($time, -8)."     configured: $csv_delimiter\n");
               print(substr($time, -8)."       detected: $detected_csv_delimiter\n");
-              file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+              file_put_contents($log_file, "\n$time configured csv delimiter supported", FILE_APPEND | LOCK_EX);
             }
-          //seems we have a delimiter missmatch, ask user how to proceed
+          //seems we have a csv delimiter missmatch, ask user how to proceed
           else {
                 print(" [".ansi('red', 'fail')."]\n");
                 print(substr($time, -8)."              configured: $csv_delimiter\n");
                 print(substr($time, -8)."                detected: $detected_csv_delimiter\n");
-                file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter | detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
-                file_put_contents($log_file, "\n$time csv delimiter missmatch, asking for override", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time configured csv delimiter: $csv_delimiter", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time detected csv delimiter: $detected_csv_delimiter", FILE_APPEND | LOCK_EX);
+                file_put_contents($log_file, "\n$time csv delimiter missmatch, asking for override permission", FILE_APPEND | LOCK_EX);
 
                 //request green light from user to go ahead and use detected csv delimiter, else exit
                 print(substr($time, -8)."   use detected? (y/[n]): ");

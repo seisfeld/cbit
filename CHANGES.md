@@ -1,5 +1,9 @@
 # cbit change log
 
+## r26
+* refining csv delimiter treatment
+* changing the year in copyright line in all files
+
 ## r25
 * updating README.md
 * renaming cbit_config.h to cbit_config
