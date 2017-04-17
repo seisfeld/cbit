@@ -179,7 +179,7 @@ $ ./cbit -h
 20:00:00
 20:00:00 The MIT License (MIT) - see LICENSE file
 20:00:00
-20:00:00 cbit r24 Copyright (c) 2014-2016 Stephan Eisfeld
+20:00:00 cbit r24 Copyright (c) 2014-2017 Stephan Eisfeld
 20:00:00
 20:00:00 exiting
 ```
@@ -353,7 +353,7 @@ The filename is derived from the csv file name - given to `-f` - and the current
 
 # The MIT License (MIT)
 
-**Copyright (c) 2014-2016 Stephan Eisfeld**
+**Copyright (c) 2014-2017 Stephan Eisfeld**
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
