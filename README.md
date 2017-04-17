@@ -3,7 +3,7 @@ cbit
 
 _cucm bulk import tool_
 
-#What do you need?
+# What do you need?
 
 * [Cisco Unified Communication Manager](http://www.cisco.com/c/en/us/products/unified-communications/unified-communications-manager-callmanager/index.html)
 * [PHP](http://php.net) with [cURL](http://curl.haxx.se) support
@@ -11,11 +11,11 @@ _cucm bulk import tool_
 
 **DISCLAIMER:** It's assumed you have admin access to your Cisco Unified Communication Manager, are familiar with the GUI and that you generally know what you are doing. Depending on your environment and for security reasons, creating a special user for the script that can only access the Administrative XML API, is recommended.
 
-#What is it?
+# What is it?
 
 The _cucm bulk import tool_ (_cbit_), is a cli script written in PHP to automate adding/deleting/updating objects (for example: srst references, device pools, sip trunks, locations, hunt pilots, phones...) on the Cisco Unified Communication Manager (CUCM) using it's Administrative XML (AXL) API.
 
-#What can you use this for?
+# What can you use this for?
 
 Usually a site on the CUCM consists of several objects. Some are mandatory, some are optional depending on your overall voice network design and features you have in use. A site maybe needs a location, srst reference, calling search space, possibly a region, site specific partitions, translation patterns, phones, a gateway and likely some more objects, which you need to create for every site over and over again. Or you are working in a lab environment and need to create/delete the above over and over again to test and simulate different setups.
 
@@ -23,11 +23,11 @@ In large installations chances are high that the settings for most of the above 
 
 With _cbit_ you can write yourself templates for all the different objects which look the same and a csv file with all variable data that changes per site. Then you let _cbit_ do the work: "Merging" the templates with the data from the csv file and then adding the objects to the CUCM. It does not matter anymore if you need to add one partition or a hundred.
 
-#How does it work?
+# How does it work?
 
 First, let's have a look at the example files included:
 
-##example_addSrst1.xml
+## example_addSrst1.xml
 This is an example to add a srst reference to the CUCM:
 
 ```
@@ -45,7 +45,7 @@ This is an example to add a srst reference to the CUCM:
 </soapenv:Envelope>
 ```
 
-##example_addRoutePartition1.xml
+## example_addRoutePartition1.xml
 This is an example to add a route partition to the CUCM:
 
 ```
@@ -62,7 +62,7 @@ This is an example to add a route partition to the CUCM:
 </soapenv:Envelope>
 ```
 
-##example.csv
+## example.csv
 This is an example csv where the variable data comes from:
 
 ```
@@ -74,7 +74,7 @@ SiteC;10.10.30.1
 
 **IMPORTANT**: By default, _cbit_ uses `;` (semicolon) as delimiter for the csv files. This can be changed to `,` (comma) in the config file `cbit_config` if necessary. Other delimiters are not supported!
 
--
+---
 
 Now let's look a little closer at the first template. The first line always has to contain the AXL API version of the CUCM _cbit_ talks to. The important part is within the name space declaration: `xmlns:ns="http://www.cisco.com/AXL/API/9.1"` In this case we instruct to use AXL API verion **9.1**. _cbit_ will read this information and will check if the version of the CUCM it talks to supports this AXL API version. It will also tell you what older AXL API versions you can use with your version of CUCM (usefull in case you want to reuse older templates after you did upgrade your CUCM).
 
@@ -82,7 +82,7 @@ The rest of the SOAP message are the instructions to create a srst reference on 
 
 The second template follows the same structure. In this case it's a SOAP message to create a route partition.
 
-##Variables
+## Variables
 
 Maybe you did spot the words in double square brackets `[[` and `]]` in the templates. These are actually **variables** which make the connection to the csv file. There are a couple rules when it comes to these variables:
 
@@ -94,7 +94,7 @@ Maybe you did spot the words in double square brackets `[[` and `]]` in the temp
 
 In the csv file you have a header in the first line, where you can find the same **variables** just without the brackets. In this case we have `cbitId;cbitSrst1Ip` followed by the actual data for three sites. The identifier of the site and the ip used for the srst reference, one site per line.
 
--
+---
 
 When _cbit_ is run, it takes the templates and merges them with the csv data like so:
 
@@ -116,9 +116,9 @@ And three route partitions:
 
 That way you can chain as many different templates as you would like and merge these with as many csv data as you would like to build complete sites on the CUCM.
 
-#Usage
+# Usage
 
-##Configuration
+## Configuration
 
 _cbit_ uses a config file called `cbit_config` which needs to be placed in the same directory as the main script. There are three main parts that you need to configure before you can use _cbit_.
 
@@ -152,11 +152,11 @@ $templates[] = 'example_addRoutePartition1.xml';
 
 You usually don't need to tamper with the rest of the `cbit_config` file.
 
-##Running the script
+## Running the script
 
 Once you have completed all your templates and your `cbit_config` file you can run _cbit_.
 
-###Command line options
+### Command line options
 
 * There is a `-h` option which displays a little help like so:
 
@@ -334,7 +334,7 @@ $ ./cbit -b5
 20:00:00 exiting
 ```
 
-##The log file
+## The log file
 
 _cbit_ writes a quite verbose log file everytime you run it. The default name is `cbit.log` but this can be changed in the config file `cbit_config`:
 
@@ -351,7 +351,7 @@ renaming cbit.log -> example.1388602800.log
 
 The filename is derived from the csv file name - given to `-f` - and the current unix time stamp to quickly build a rather unique name.
 
-#The MIT License (MIT)
+# The MIT License (MIT)
 
 **Copyright (c) 2014-2016 Stephan Eisfeld**
 
