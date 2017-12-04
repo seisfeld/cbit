@@ -15,7 +15,10 @@ $jobsfailed = array();
 $supported_csv_delimiters = array(';', ',');
 
 //which cucm:db version supports which axl api version(s)
-$cucmdb_supported_axl_apis['10.5'] = array('10.5', '10.0', '9.1', '9.0', '8.5', '8.0');
+$cucmdb_supported_axl_apis['12.0'] = array('12.0', '11.5', '11.0', '10.0');
+$cucmdb_supported_axl_apis['11.5'] = array('11.5', '11.0', '10.0', '9.1', '9.0');
+$cucmdb_supported_axl_apis['11.0'] = array('11.0', '10.0', '9.1', '9.0');
+$cucmdb_supported_axl_apis['10.5'] = array('10.0', '9.1', '9.0', '8.5', '8.0');
 $cucmdb_supported_axl_apis['10.0'] = array('10.0', '9.1', '9.0', '8.5', '8.0');
 $cucmdb_supported_axl_apis['9.1'] = array('9.1', '9.0', '8.5', '8.0', '7.1');
 $cucmdb_supported_axl_apis['9.0'] = array('9.0', '8.5', '8.0', '7.1');
