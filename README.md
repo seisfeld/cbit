@@ -162,7 +162,7 @@ Once you have completed all your templates and your `cbit_config` file you can r
 
  ```
 $ ./cbit -h
-20:00:00 cbit r24 starting up
+20:00:00 cbit r27 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
 20:00:00 checking for required modules
@@ -179,7 +179,7 @@ $ ./cbit -h
 20:00:00
 20:00:00 The MIT License (MIT) - see LICENSE file
 20:00:00
-20:00:00 cbit r24 Copyright (c) 2014-2017 Stephan Eisfeld
+20:00:00 cbit r27 Copyright (c) 2014-2018 Stephan Eisfeld
 20:00:00
 20:00:00 exiting
 ```
@@ -188,7 +188,7 @@ $ ./cbit -h
 
  ```
 $ ./cbit -c
-20:00:00 cbit r24 starting up
+20:00:00 cbit r27 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
 20:00:00 checking for required modules
@@ -207,7 +207,7 @@ $ ./cbit -c
 
  ```
 $ ./cbit -fexample.csv
-20:00:00 cbit r24 starting up
+20:00:00 cbit r27 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
 20:00:00 checking for required modules
@@ -313,7 +313,7 @@ $ ./cbit -fexample.csv
 
  ```
 $ ./cbit -b5
-20:00:00 cbit r24 starting up
+20:00:00 cbit r27 starting up
 20:00:00 use -h for help
 20:00:00 using cbit.log to log messages
 20:00:00 checking for required modules
@@ -353,7 +353,7 @@ The filename is derived from the csv file name - given to `-f` - and the current
 
 # The MIT License (MIT)
 
-**Copyright (c) 2014-2017 Stephan Eisfeld**
+**Copyright (c) 2014-2018 Stephan Eisfeld**
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -1,5 +1,10 @@
 # cbit change log
 
+## r27
+* extends axl api matrix
+* updating README.md
+* 2018 updates
+
 ## r26
 * refining csv delimiter treatment
 * changing the year in copyright line in all files
