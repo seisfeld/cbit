@@ -3,7 +3,7 @@
 //cbit - cucm bulk import tool
 
 //name and version
-$uname = 'cbit r27';
+$uname = 'cbit r28';
 
 //define some arrays
 $templates = array();
@@ -201,7 +201,7 @@ if (isset($options['h'])) {
     print(substr($time, -8)."\n");
     print(substr($time, -8)." The MIT License (MIT) - see LICENSE file\n");
     print(substr($time, -8)."\n");
-    print(substr($time, -8)." $uname Copyright (c) 2014-2017 Stephan Eisfeld\n");
+    print(substr($time, -8)." $uname Copyright (c) 2014-2022 Stephan Eisfeld\n");
     print(substr($time, -8)."\n");
     print(substr($time, -8)." exiting\n");
     file_put_contents($log_file, "\n$time displaying help", FILE_APPEND | LOCK_EX);
