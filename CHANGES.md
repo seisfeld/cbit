@@ -1,5 +1,10 @@
 # cbit change log
 
+## r28
+* extends axl api matrix
+* updating README.md
+* updating LICENSE file
+
 ## r27
 * extends axl api matrix
 * updating README.md
